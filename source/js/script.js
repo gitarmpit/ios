@@ -12,7 +12,25 @@ const app = firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 const documentRef = db.doc('locations/distance');
 
-const wav = new Audio('notify.wav');
+const soundFiles = [
+ 'sounds/birdsmstone.mp3',
+ 'sounds/bullfrog_1_call.mp3',
+ 'sounds/chirps.mp3',
+ 'sounds/cricket.mp3',
+ 'sounds/cricket_10.mp3',
+ 'sounds/cricket_short.mp3',
+ 'sounds/d_chord_guitar.mp3',
+ 'sounds/disneyland_re_entry.mp3',
+ 'sounds/e_m_m_i_chirps.mp3',
+ 'sounds/goose_honk.mp3',
+ 'sounds/migos_chirpin.mp3',
+ 'sounds/notify.wav',
+ 'sounds/samsung_whistle.mp3',
+ 'sounds/sheep.mp3',
+ 'sounds/twitterriffic_chirp.mp3',
+ 'sounds/untitled_goose_honk.mp3',
+];
+
 
 
 // Get references to HTML elements
@@ -48,15 +66,33 @@ function displayError(message) {
 }
 
 
+function playRandomSound() {
+  const randomIndex = Math.floor(Math.random() * soundFiles.length);
+  const randomSound = soundFiles[randomIndex];
+
+  const audio = new Audio();
+  audio.src = randomSound;
+  audio.play();
+}
+
+function reset() {
+  if (unsubscribe) {
+    unsubscribe();
+    unsubscribe = null;
+  }
+  dataWindow.innerHTML = '';
+  displayError(''); // Clear any previous error message
+}
 
 // Start button click event handler
 startButton.addEventListener('click', function () {
   try {
+    reset();
     unsubscribe = documentRef.onSnapshot(function (doc) {
       const source = doc.metadata.hasPendingWrites ? 'Local' : 'Server';
       const data = doc.data();
       console.log(source, data['ts']);
-      wav.play();
+      playRandomSound();
       addDataToWindow(data);
     });
     displayError(''); // Clear any previous error message
@@ -66,14 +102,7 @@ startButton.addEventListener('click', function () {
 });
 
 // Stop button click event handler
-stopButton.addEventListener('click', function () {
-  if (unsubscribe) {
-    unsubscribe();
-    unsubscribe = null;
-  }
-  dataWindow.innerHTML = '';
-  displayError(''); // Clear any previous error message
-});
+stopButton.addEventListener('click', reset);
 
 saveLogButton.addEventListener("click", function () {
   const filename = prompt("Enter a filename:");

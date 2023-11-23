@@ -1,0 +1,11 @@
+#data-window {
+  height: 500px;
+  overflow-y: scroll;
+  border: 1px solid #ccc;
+  padding: 10px;
+}
+
+#error-message {
+  color: red;
+  margin-top: 10px;
+}
