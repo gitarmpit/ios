@@ -3,6 +3,7 @@ import Firebase
 
 class FireStoreManager: NSObject, ObservableObject {
     
+    static let shared = FireStoreManager()
     private let db = Firestore.firestore()
     
     @Published var firestoreError: String = ""
