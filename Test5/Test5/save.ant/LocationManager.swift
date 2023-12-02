@@ -1,12 +1,16 @@
 import CoreLocation
+import HealthKit
+import UIKit
 
 class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
-    
+
+    @Published var status: String = ""
     @Published var totalDistance: CLLocationDistance = 0.0
     @Published var durationString: String = ""
     @Published var speed: Double = 0.0
     @Published var speedAvg: Double = 0.0
-    @Published var stepCount: Int = 0
+    @Published var stepCountString: String = ""
+    private var stepCount: Int = 0
     
     @Published var isHome: Bool = true
     private var tooFarAlertSent: Bool = false
@@ -53,12 +57,19 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     
     private let speedMultiplier: Double
     private var fs: FireStoreManager
+    private var timer: Timer?
+    private var GPS_Running: Bool = false
+    private let stepSize: Double = 0.6
     
     init (fs: FireStoreManager) {
         self.fs = fs
         self.speedMultiplier = kmhMultiplier
         super.init()
         locationManager.delegate = self
+    }
+    
+    func initLocationManager() {
+        startUpdatingLocation()
     }
     
     func clearAll()  {
@@ -85,11 +96,13 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         stationaryAlertSent = false
         alertMsg = ""
         stepCount = 0
+        stepCountString = ""
         validCourse = false
         invalidCourseCount = 0
     }
     
     func startUpdatingLocation() {
+        GPS_Running = true
         clearAll()
         locationManager.requestAlwaysAuthorization()
         locationManager.requestWhenInUseAuthorization()
@@ -102,6 +115,7 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     }
     
     func stopUpdatingLocation() {
+        GPS_Running = false
         locationManager.stopUpdatingLocation()
     }
     
@@ -145,6 +159,19 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
             fs.sendDebug(msg: String(format: "GPS update rate: %.2f", gpsUpdateRate))
             lastPingTs = Date().timeIntervalSince1970
             gpsUpdateCnt = 0
+            let batteryLevel = UIDevice.current.batteryLevel
+            var batteryState = "???"
+            if (UIDevice.current.batteryState == .unplugged) {
+                batteryState = "unplugged"
+            }
+            else if (UIDevice.current.batteryState == .charging) {
+                batteryState = "charging"
+            }
+            else if (UIDevice.current.batteryState == .full) {
+                batteryState = "full"
+            }
+
+            fs.sendDebug(msg: "battery: level=" + String(batteryLevel*100.0) + "%, state: " + batteryState)
         }
     }
     
@@ -168,6 +195,7 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
             msg = speedString + ", " + speedAvgString
             fs.sendDebug(msg: msg)
             fs.sendDebug(msg: "validCourse: " + String(validCourse) + ", invalidCoureCount: " + String(invalidCourseCount))
+            fs.sendDebug(msg: "stepCount: " + String(stepCount))
             fs.sendLocation(loc: locationString)
             lastDebugUpdateTs = Date().timeIntervalSince1970
         }
@@ -222,11 +250,11 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         if (!isHome) {
             totalCount += 1
             speed = currentSpeed
-            //speedSum += speed
-            //speedAvg = speedSum / Double(totalCount)
+            speedSum += speed
+            speedAvg = speedSum / Double(totalCount)
             totalDistance += distance
             let duration = Date().timeIntervalSince(leftHomeTs)
-            speedAvg = totalDistance / duration * speedMultiplier
+            //speedAvg = totalDistance / duration * speedMultiplier
             durationString = durationToString(durationInSeconds: duration)
         }
         distanceFromHome = homeLocation!.distance(from: location)
@@ -250,6 +278,10 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     func checkArrival() {
         if (distanceFromHome < arrivalProximity) {
             isHome = true
+            let duration = Date().timeIntervalSince(leftHomeTs)
+            speedAvg = totalDistance / duration * speedMultiplier
+            stepCount = Int(totalDistance / stepSize)
+            stepCountString = String(format: "%5d", stepCount)
             speed = 0
             let msg = "Arrival. Duration:" + durationString
             fs.sendAlertNotification(msg: msg, type: "arrival")

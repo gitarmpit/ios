@@ -1,8 +1,34 @@
 import SwiftUI
 import Firebase
 
+struct SettingsView: View {
+    var body: some View {
+        VStack {
+            Text("Settings")
+        }
+    }
+}
 
 struct ContentView: View {
+    var body: some View {
+        TabView {
+            MainView()
+                .tabItem {
+                    Image(systemName: "figure.walk")
+                }
+            SettingsView()
+                .tabItem {
+                    Image(systemName: "gearshape")
+                }
+        }
+        .onAppear {
+            //locationManager.initLocationManager()
+            //    accManager.startAccelerometer()
+        }
+    }
+
+
+struct MainView: View {
     
     @StateObject private var fsManager: FireStoreManager
     //@StateObject private var accManager: AccelerationManager
@@ -74,7 +100,7 @@ struct ContentView: View {
                     Text(locationManager.stepCountString)
                         .font(.system(size: 40))
                         .fontWeight(.bold)
-                        .foregroundColor(fgColor)
+                        .foregroundColor(.gray)
                 }
             }
         }

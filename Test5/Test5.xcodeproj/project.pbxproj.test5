@@ -14,7 +14,7 @@
 		D0600DB82B092E4500855A40 /* LocationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0600DB72B092E4500855A40 /* LocationManager.swift */; };
 		D0600DBB2B0A93FB00855A40 /* AccelerationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0600DBA2B0A93FA00855A40 /* AccelerationManager.swift */; };
 		D0600DBD2B0A983300855A40 /* FirestoreManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0600DBC2B0A983300855A40 /* FirestoreManager.swift */; };
-		D07C826E2B1B8BEE00466934 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = D07C826D2B1B8BEE00466934 /* GoogleService-Info.plist */; };
+		D06F8EE92B181BCE008328CD /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = D06F8EE82B181BCE008328CD /* GoogleService-Info.plist */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -27,7 +27,7 @@
 		D0600DBA2B0A93FA00855A40 /* AccelerationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccelerationManager.swift; sourceTree = "<group>"; };
 		D0600DBC2B0A983300855A40 /* FirestoreManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirestoreManager.swift; sourceTree = "<group>"; };
 		D066FB832B1593D200C42940 /* Test5Release.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Test5Release.entitlements; sourceTree = "<group>"; };
-		D07C826D2B1B8BEE00466934 /* GoogleService-Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
+		D06F8EE82B181BCE008328CD /* GoogleService-Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -61,7 +61,7 @@
 		D047E0042B05CB0800C842EE /* Test5 */ = {
 			isa = PBXGroup;
 			children = (
-				D07C826D2B1B8BEE00466934 /* GoogleService-Info.plist */,
+				D06F8EE82B181BCE008328CD /* GoogleService-Info.plist */,
 				D066FB832B1593D200C42940 /* Test5Release.entitlements */,
 				D0600DB92B0939CC00855A40 /* Info.plist */,
 				D047E0052B05CB0800C842EE /* Test5App.swift */,
@@ -139,7 +139,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				D047E00A2B05CB0B00C842EE /* Assets.xcassets in Resources */,
-				D07C826E2B1B8BEE00466934 /* GoogleService-Info.plist in Resources */,
+				D06F8EE92B181BCE008328CD /* GoogleService-Info.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -251,7 +251,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = anatoly.AnTracker;
+				PRODUCT_BUNDLE_IDENTIFIER = organ1.Test7;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";

@@ -12,7 +12,6 @@
 		<string>fetch</string>
 		<string>location</string>
 		<string>processing</string>
-		<string>remote-notification</string>
 		<string>voip</string>
 	</array>
 </dict>

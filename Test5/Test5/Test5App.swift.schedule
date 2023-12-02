@@ -22,30 +22,30 @@ final class MyAppDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
     
         FirebaseApp.configure()
-        FireStoreManager.shared.sendDebug(msg: "before register")
+        FireStoreManager.shared.sendDebug(msg: "before register3")
 
-        BGTaskScheduler.shared.register(forTaskWithIdentifier: "StopLocationManager", using: nil) { task in
+        BGTaskScheduler.shared.register(forTaskWithIdentifier: "StopLocationManager3", using: nil) { task in
             self.handleAppRefresh(task: task as! BGProcessingTask)
         }
-        FireStoreManager.shared.sendDebug(msg: "after register")
+        FireStoreManager.shared.sendDebug(msg: "after register3")
         scheduleAppRefresh()
         return true
     }
     
     func scheduleAppRefresh() {
-       let request = BGProcessingTaskRequest(identifier: "StopLocationManager")
+       let request = BGProcessingTaskRequest(identifier: "StopLocationManager3")
        request.earliestBeginDate = Date(timeIntervalSinceNow: 60 * 60)
         do {
           try BGTaskScheduler.shared.submit(request)
-            FireStoreManager.shared.sendDebug(msg: "after submit")
+            FireStoreManager.shared.sendDebug(msg: "after submit3")
 
        } catch {
-           FireStoreManager.shared.sendDebug(msg: "submit failed: " + error.localizedDescription)
+           FireStoreManager.shared.sendDebug(msg: "submit failed3" + error.localizedDescription)
        }
     }
     
     func handleAppRefresh(task: BGProcessingTask) {
-        FireStoreManager.shared.sendDebug(msg: "fired!")
+        FireStoreManager.shared.sendDebug(msg: "fired3!")
         scheduleAppRefresh()
     }
 }

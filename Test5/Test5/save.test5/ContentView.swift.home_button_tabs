@@ -1,16 +1,28 @@
 import SwiftUI
 import Firebase
 
+/*
+extension UITabBar {
+    override open func sizeThatFits(_ size: CGSize) -> CGSize {
+        var sizeThatFits = super.sizeThatFits(size)
+        sizeThatFits.height = 60
+        return sizeThatFits
+    }
+}
+*/
+
+struct SettingsView: View {
+    var body: some View {
+        VStack {
+            Text("Settings")
+        }
+    }
+}
 
 struct ContentView: View {
-    
     @StateObject private var fsManager: FireStoreManager
     //@StateObject private var accManager: AccelerationManager
     @StateObject private var locationManager: LocationManager
-    
-    private var fgColor: Color {
-        locationManager.isHome ? .black : Color (red: 0, green: 130/255, blue: 153/255) // Color(red: 0, green: 0, blue: 0.4)
-    }
     
     init() {
         let fsManager = FireStoreManager()
@@ -22,6 +34,39 @@ struct ContentView: View {
         _locationManager = StateObject(wrappedValue: locationManager)
         UIDevice.current.isBatteryMonitoringEnabled = true
     }
+    
+    var body: some View {
+        TabView {
+            MainView()
+                .tabItem {
+                    Image(systemName: "figure.walk")
+                }
+            SettingsView()
+                .tabItem {
+                    Image(systemName: "gearshape")
+                }
+        }
+        .environmentObject(locationManager)
+        .onAppear {
+            locationManager.initLocationManager()
+            //    accManager.startAccelerometer()
+        }
+    }
+}
+
+struct MainView: View {
+    @EnvironmentObject private var fsManager: FireStoreManager
+    //@StateObject private var accManager: AccelerationManager
+    @EnvironmentObject private var locationManager: LocationManager
+
+    init() {
+        
+    }
+    
+    private var fgColor: Color {
+        locationManager.isHome ? .black : Color (red: 0, green: 130/255, blue: 153/255) // Color(red: 0, green: 0, blue: 0.4)
+    }
+    
     
     var body: some View {
         ZStack {
@@ -74,12 +119,12 @@ struct ContentView: View {
                     Text(locationManager.stepCountString)
                         .font(.system(size: 40))
                         .fontWeight(.bold)
-                        .foregroundColor(fgColor)
+                        .foregroundColor(.gray)
                 }
             }
         }
         .onAppear {
-            locationManager.initLocationManager()
+            //locationManager.initLocationManager()
             //    accManager.startAccelerometer()
         }
         

@@ -1,5 +1,6 @@
 import CoreLocation
 import HealthKit
+import UIKit
 
 class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
 
@@ -8,7 +9,8 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     @Published var durationString: String = ""
     @Published var speed: Double = 0.0
     @Published var speedAvg: Double = 0.0
-    @Published var stepCount: Int = 0
+    @Published var stepCountString: String = ""
+    private var stepCount: Int = 0
     
     @Published var isHome: Bool = true
     private var tooFarAlertSent: Bool = false
@@ -38,7 +40,7 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     private let logUpdateInterval: Double = 10
     
     // For ping and GPS rate calculation
-    private let pingUpdateInterval: Double = 60
+    private let pingUpdateInterval: Double = 3600
     private var lastPingTs: TimeInterval = 0
     private var gpsUpdateCnt: Int = 0
     // End of GPS rate calc
@@ -57,6 +59,7 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     private var fs: FireStoreManager
     private var timer: Timer?
     private var GPS_Running: Bool = false
+    private let stepSize: Double = 0.6
     
     init (fs: FireStoreManager) {
         self.fs = fs
@@ -66,7 +69,7 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     }
     
     func initLocationManager() {
-        //startUpdatingLocation()
+        startUpdatingLocation()
     }
     
     func clearAll()  {
@@ -93,6 +96,7 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         stationaryAlertSent = false
         alertMsg = ""
         stepCount = 0
+        stepCountString = ""
         validCourse = false
         invalidCourseCount = 0
     }
@@ -155,6 +159,19 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
             fs.sendDebug(msg: String(format: "GPS update rate: %.2f", gpsUpdateRate))
             lastPingTs = Date().timeIntervalSince1970
             gpsUpdateCnt = 0
+            let batteryLevel = UIDevice.current.batteryLevel
+            var batteryState = "???"
+            if (UIDevice.current.batteryState == .unplugged) {
+                batteryState = "unplugged"
+            }
+            else if (UIDevice.current.batteryState == .charging) {
+                batteryState = "charging"
+            }
+            else if (UIDevice.current.batteryState == .full) {
+                batteryState = "full"
+            }
+
+            fs.sendDebug(msg: "battery: level=" + String(batteryLevel*100.0) + "%, state: " + batteryState)
         }
     }
     
@@ -178,6 +195,7 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
             msg = speedString + ", " + speedAvgString
             fs.sendDebug(msg: msg)
             fs.sendDebug(msg: "validCourse: " + String(validCourse) + ", invalidCoureCount: " + String(invalidCourseCount))
+            fs.sendDebug(msg: "stepCount: " + String(stepCount))
             fs.sendLocation(loc: locationString)
             lastDebugUpdateTs = Date().timeIntervalSince1970
         }
@@ -260,6 +278,10 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     func checkArrival() {
         if (distanceFromHome < arrivalProximity) {
             isHome = true
+            let duration = Date().timeIntervalSince(leftHomeTs)
+            speedAvg = totalDistance / duration * speedMultiplier
+            stepCount = Int(totalDistance / stepSize)
+            stepCountString = String(format: "%5d", stepCount)
             speed = 0
             let msg = "Arrival. Duration:" + durationString
             fs.sendAlertNotification(msg: msg, type: "arrival")

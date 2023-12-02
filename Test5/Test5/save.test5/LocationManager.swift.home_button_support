@@ -123,11 +123,6 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         if let location = locations.last {
             
-            if (homeLocation == nil) {
-                currentLocation = location
-                setHome()
-            }
-            
             ping()
             update(location: location)
             
@@ -168,6 +163,13 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
                 batteryState = "charging"
             }
             fs.sendDebug(msg: "battery: level=" + String(batteryLevel*100.0) + "%, state: " + batteryState)
+            if let _homeLocation = homeLocation {
+                let homeLocString = String(format: "%.5f, %.5f", _homeLocation.coordinate.latitude, _homeLocation.coordinate.longitude)
+                fs.sendDebug(msg: "home: " + homeLocString)
+            }
+            else {
+                fs.sendDebug(msg: "home not set")
+            }
         }
     }
     
