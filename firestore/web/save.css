@@ -1,0 +1,43 @@
+    .label-container {
+      display: grid;
+      grid-template-columns: max-content;
+      grid-gap: 5px;
+      justify-content: flex-start;
+      align-items: flex-start;
+      position: absolute;
+      top: 5em;
+      right: 1em;
+    }
+
+    .label {
+      display: flex;
+      align-items: baseline;
+    }
+
+    .label-name {
+      font-weight: bold;
+      margin-right: 5px;
+      white-space: nowrap;
+      width: 80px; /* Fixed width for the first column */
+    }
+
+    .label-value {
+      font-size: 16px;
+      color: black;
+    }
+
+
+  <div class="label-container">
+    <div class="label">
+      <span class="label-name">Speed:</span>
+      <span class="label-value">5.0</span>
+    </div>
+    <div class="label">
+      <span class="label-name">Distance:</span>
+      <span class="label-value">100</span>
+    </div>
+    <div class="label">
+      <span class="label-name">Time:</span>
+      <span class="label-value">00:23:11</span>
+    </div>
+  </div>
