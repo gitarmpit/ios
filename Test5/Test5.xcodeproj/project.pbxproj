@@ -14,7 +14,7 @@
 		D0600DB82B092E4500855A40 /* LocationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0600DB72B092E4500855A40 /* LocationManager.swift */; };
 		D0600DBB2B0A93FB00855A40 /* AccelerationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0600DBA2B0A93FA00855A40 /* AccelerationManager.swift */; };
 		D0600DBD2B0A983300855A40 /* FirestoreManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0600DBC2B0A983300855A40 /* FirestoreManager.swift */; };
-		D07C82702B1B9FBE00466934 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = D07C826F2B1B9FBD00466934 /* GoogleService-Info.plist */; };
+		D08ED4122B2031AB003B1199 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = D08ED4112B2031AA003B1199 /* GoogleService-Info.plist */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -27,7 +27,7 @@
 		D0600DBA2B0A93FA00855A40 /* AccelerationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccelerationManager.swift; sourceTree = "<group>"; };
 		D0600DBC2B0A983300855A40 /* FirestoreManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirestoreManager.swift; sourceTree = "<group>"; };
 		D066FB832B1593D200C42940 /* Test5Release.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Test5Release.entitlements; sourceTree = "<group>"; };
-		D07C826F2B1B9FBD00466934 /* GoogleService-Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
+		D08ED4112B2031AA003B1199 /* GoogleService-Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -61,7 +61,7 @@
 		D047E0042B05CB0800C842EE /* Test5 */ = {
 			isa = PBXGroup;
 			children = (
-				D07C826F2B1B9FBD00466934 /* GoogleService-Info.plist */,
+				D08ED4112B2031AA003B1199 /* GoogleService-Info.plist */,
 				D066FB832B1593D200C42940 /* Test5Release.entitlements */,
 				D0600DB92B0939CC00855A40 /* Info.plist */,
 				D047E0052B05CB0800C842EE /* Test5App.swift */,
@@ -139,7 +139,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				D047E00A2B05CB0B00C842EE /* Assets.xcassets in Resources */,
-				D07C82702B1B9FBE00466934 /* GoogleService-Info.plist in Resources */,
+				D08ED4122B2031AB003B1199 /* GoogleService-Info.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -235,10 +235,10 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "NEED IT";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "NEED IT";
-				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = YES;
-				INFOPLIST_KEY_NSLocationAlwaysUsageDescription = YES;
+				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Requesting Location Always and When in Use";
+				INFOPLIST_KEY_NSLocationAlwaysUsageDescription = "Requesting Location Always";
 				INFOPLIST_KEY_NSLocationUsageDescription = "";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "NEED IT";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Requesting Location When in Use";
 				INFOPLIST_KEY_NSMotionUsageDescription = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;

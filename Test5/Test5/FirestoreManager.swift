@@ -26,43 +26,55 @@ class FireStoreManager: NSObject, ObservableObject {
         saveDataToFirestore(col: "debug", doc: "loc", data: data)
     }
     
-    /*
-    func sendLocation(ts: String, loc: String) {
-        let col = "trips"
-        let doc = "trip_" + ts
-        let docRef = db.collection(col).document(doc)
-        
-        docRef.getDocument { (document, error) in
-            if let document = document, document.exists {
-                // Document exists, update the list field
-                var list = document.data()?["coords"] as? [String] ?? []
-                list.append(loc)
-                
-                docRef.setData(["coords": list]) { error in
-                    if let error = error {
-                        self.firestoreError = error.localizedDescription
-                    }
-                    else {
-                        self.firestoreError = "updated"
-                    }
-                }
+    func addTrip(tripId: String) {
+        let timestamp = Timestamp()
+        let data: [String: Any] = [
+            "id": tripId,
+            "ts": timestamp,
+            "distance": "",
+            "speedAvg": "",
+            "duration": ""
+        ]
+        saveDataToFirestore(col: "trips", doc: tripId, data: data)
+    }
+
+    func addPointToTrip (tripId: String, seq: Int, point: TripPoint) {
+
+        let data: [String: Any] = [
+            "lat": String(format: "%.6f", point.latitude),
+            "long": String(format: "%.6f", point.longitude),
+            "speed": point.speed,
+            "speedAvg": point.speedAvg,
+            "distance": String(format: "%.3f", point.distance),
+            "duration": point.duration
+        ]
+
+        let sseq = String(format: "%06d", seq);
+        let pointsCol = db.collection("trips").document(tripId).collection("points")
+
+        pointsCol.document(sseq).setData(data) { err in
+            if let err = err {
+                self.firestoreError = err.localizedDescription;
             }
-            else {
-                let list = [loc]
-                
-                docRef.setData(["coords": list]) { error in
-                    if let error = error {
-                        self.firestoreError = error.localizedDescription
-                    }
-                    else {
-                        self.firestoreError = "added new"
-                    }
-                }
-            }
+            self.updateTrip (tripId: tripId, distance: point.distance, speedAvg: point.speedAvg, duration: point.duration)
         }
         
+        saveDataToFirestore(col: "trips", doc: "currentTrip", data: data)
     }
-     */
+    
+    func updateTrip (tripId: String, distance: Double, speedAvg: Double, duration: String) {
+        let data: [String: Any] = [
+            "speedAvg": speedAvg,
+            "distance": String(format: "%.1f", distance),
+            "duration": duration
+        ]
+        self.db.collection("trips").document(tripId).updateData(data)   { err in
+            if let err = err {
+                self.firestoreError = err.localizedDescription;
+            }
+        }
+
+    }
     
     private func saveDataToFirestore(col: String, doc: String, data: [String: Any]) {
         let col = db.collection(col)
