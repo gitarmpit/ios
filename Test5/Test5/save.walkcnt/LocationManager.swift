@@ -57,7 +57,7 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     //private let stepSize: Double = 0.6
     private let stepSize: Double = 0.78
     
-    private let tripLogUpdateInterval: TimeInterval = 10
+    private let tripLogUpdateInterval: TimeInterval = 1
     private var lastTripLogUpdateTs: TimeInterval = 0
     
     private let speedMovingAvg: SpeedAverage = SpeedAverage(windowSize: 5)
@@ -85,16 +85,20 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     func startStopTrip() {
         if (isRunning) {
             isRunning = false
+            let duration = Date().timeIntervalSince(leftHomeTs)
+            speedAvg = totalDistance / duration * speedMultiplier
+            self.fs.sendDebug(msg: "Arrival")
         }
         else {
             isRunning = true
             clearAll()
-            self.fs.sendDebug(msg: "Started trip")
+            self.fs.sendDebug(msg: "Departure")
         }
         setButtonAction()
     }
     
     func stop() {
+        
         // locationManager.stopUpdatingLocation()
     }
     
@@ -118,7 +122,6 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
             
             if (isRunning) {
                 update(location: location)
-                tripLog()
                 lastLocation = currentLocation
             }
         }
@@ -148,13 +151,14 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         var currentSpeed = 0.0
         var distance = 0.0
 
-        
         locationString = String(format: "%.6f, %.6f", location.coordinate.latitude, location.coordinate.longitude)
         currentLocation = location
-        
+
+        var doLog = false
         if (lastLocation != nil) && (location.speed > 0.15) {
             distance = location.distance(from: lastLocation!)
             currentSpeed = location.speed * speedMultiplier
+            doLog = true
         }
         
         totalCount += 1
@@ -166,6 +170,10 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         //speedAvg = totalDistance / duration * speedMultiplier
         durationString = durationToString(durationInSeconds: duration)
         stepCount = Int(totalDistance / stepSize)
+
+        if (doLog) {
+            tripLog()
+        }
     }
 
     
