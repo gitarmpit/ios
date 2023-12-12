@@ -1,6 +1,7 @@
 const fs = require('fs');
 
 const firebase = require('firebase/compat/app');
+const { create } = require('domain');
 require('firebase/auth');
 require('firebase/compat/firestore');
 
@@ -14,17 +15,10 @@ const firebaseConfig = {
 };
 
 const app = firebase.initializeApp(firebaseConfig);
-console.log = function(message) {
-  logStream.write(message + '\n');
-  process.stdout.write(message + '\n');
-};
 
 const db = firebase.firestore();
 
 const documentRef = db.doc('debug/debug');
-
-var logStream = null;
-
 
 function ts() {
   const date = new Date();
@@ -51,27 +45,46 @@ function ts2() {
   return timestamp;
 }
 
+var fd = null;
 var unsubscribe = null;
 
-function subscribe() {
-  if (unsubscribe !== null) {
-    unsubscribe();
-    if (logStream !== null) {
-      logStream.end();
-    }
+function createLog() {
+  if (fd !== null) {
+      fs.closeSync(fd)
   }
-
-  const fname = "noti." + ts2();
-  logStream = fs.createWriteStream(fname, { flags: 'a' });
-
-  unsubscribe = documentRef.onSnapshot(function(doc) {
-    const source = doc.metadata.hasPendingWrites ? 'Local' : 'Server';
-    var d = doc.data()
-    console.log(ts() + ": " + d.ts + ": " + d.msg );
-  });
-  
+  const fname = "G:\\My Drive\\logs\\2\\noti." + ts2() + ".txt";
+  fd = fs.openSync(fname, 'w')
 }
 
+var skip = false;
+
+function subscribe() {
+
+  if (unsubscribe !== null) {
+    skip = true;
+    unsubscribe();
+  }
+
+  // new file at 7am
+  var currentHour = new Date().getHours();
+  if (currentHour === 7) {
+    createLog();
+  }
+
+  unsubscribe = documentRef.onSnapshot(function (doc) {
+    var d = doc.data()
+    if (!skip) {
+      fs.writeSync(fd, ts() + ": " + d.ts + ": " + d.msg + "\n");
+    }
+    else {
+      skip = false;
+    }
+  });
+
+  setTimeout(subscribe, 3600 * 1000);
+
+}
+
+createLog();
 subscribe();
-setInterval(subscribe, 3600*24*1000);
 
