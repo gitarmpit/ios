@@ -12,33 +12,44 @@ const firebaseConfig = {
   appId: "1:436603702917:web:7c9af0cf7eb2d16b16e3ec"
 };
 
-let tripName = process.argv[2];
 const app = firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
-const jsonData = fs.readFileSync('points.json', 'utf-8');
-const pointsData = JSON.parse(jsonData);
+const tripImport = async (fileName) => {
+  try {
+    // Read the JSON file
+    const jsonData = fs.readFileSync(fileName, 'utf8');
 
-const tripRef = db.collection('trips').doc(tripName);
-tripRef.set({}).then(() => {
-  console.log("trip created");
-})
+    // Parse the JSON data
+    const tripData = JSON.parse(jsonData);
 
+    const { speedAvg, distance, ts, points } = tripData;
+    const timestamp = new firebase.firestore.Timestamp(
+      ts.seconds,
+      ts.nanoseconds
+    );
 
-const pointsCollection = tripRef.collection('points');
-
-let seq = 0;
-
-pointsData.forEach((point) => {
-  const sseq = seq.toString().padStart(4, '0');
-  const pointRef = pointsCollection.doc(sseq);
-  ++seq;
-
-  pointRef.set(point)
-    .then(() => {
-      console.log(`Point with ID ${seq} added successfully.`);
-    })
-    .catch((error) => {
-      console.error(`Error adding point with ID ${seq}:`, error);
+    // Create a new trip document in the "trips" collection
+    const tripRef = db.collection('trips').doc(tripData.id + " - 2");
+    await tripRef.set({
+      speedAvg,
+      distance,
+      ts: timestamp,
     });
-});
+
+    const pointsCollectionRef = tripRef.collection('points');
+
+    for (let i = 0; i < tripData.points.length; i++) {
+      const point = tripData.points[i].data;
+      console.log ("importing " + tripData.points[i].id); 
+      await pointsCollectionRef.doc(tripData.points[i].id).set(point);
+    }
+    console.log('Trip imported successfully.');
+    app.delete();
+
+  } catch (error) {
+    console.error('Error importing trip:', error);
+  }
+};
+
+tripImport(process.argv[2]);
