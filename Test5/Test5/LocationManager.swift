@@ -336,10 +336,9 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
             msg = courseString + ", " + courseDiffString + ", " + maxCourseDiffString
             fs.sendDebug(msg: msg)
             
-            let speedString = speedToString(speed)
-            let speedAvgString = speedToString(speedAvg)
-            msg = speedString + ", " + speedAvgString
-            fs.sendDebug(msg: msg)
+            speedString = speedToString(speed)
+            speedAvgString = speedToString(speedAvg)
+            fs.sendDebug(msg: "speed: " + speedString + ", avg: " + speedAvgString + ", m/s: " + String(format: "%.6f", speed))
             fs.sendDebug(msg: "validCourse: " + String(validCourse) + ", invalidCoureCount: " + String(invalidCourseCount))
             fs.sendDebug(msg: "stepCount: " + String(stepCount))
             fs.sendDebug(msg: "stepCount: " + String(stepCount))

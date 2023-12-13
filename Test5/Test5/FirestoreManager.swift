@@ -40,13 +40,15 @@ class FireStoreManager: NSObject, ObservableObject {
 
     func addPointToTrip (tripId: String, seq: Int, point: TripPoint) {
 
+        let ts = createTimeStamp()
         let data: [String: Any] = [
             "lat": String(format: "%.6f", point.latitude),
             "long": String(format: "%.6f", point.longitude),
-            "speed": point.speed,
+            "speed": String(format: "%.6f", point.speed),
             "speedAvg": point.speedAvg,
             "distance": String(format: "%.3f", point.distance),
-            "duration": point.duration
+            "duration": point.duration,
+            "ts": ts
         ]
 
         let sseq = String(format: "%06d", seq);
@@ -59,7 +61,7 @@ class FireStoreManager: NSObject, ObservableObject {
             self.updateTrip (tripId: tripId, distance: point.distance, speedAvg: point.speedAvg, duration: point.duration)
         }
         
-        saveDataToFirestore(col: "trips", doc: "currentTrip", data: data)
+        saveDataToFirestore(col: "trips", doc: "current", data: data)
     }
     
     func updateTrip (tripId: String, distance: Double, speedAvg: Double, duration: String) {
