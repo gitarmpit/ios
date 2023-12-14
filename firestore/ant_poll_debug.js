@@ -45,16 +45,11 @@ function ts2() {
   return timestamp;
 }
 
-var fd = null;
 var unsubscribe = null;
+var fname = "";
 
 function createLog() {
-  if (fd !== null) {
-      fs.closeSync(fd)
-  }
-  const fname = "G:\\My Drive\\logs\\2\\ant." + ts2() + ".txt";
-  //const fname = "ant2." + ts2();
-  fd = fs.openSync(fname, 'w')
+  fname = "G:\\My Drive\\logs\\2\\ant." + ts2() + ".txt";
 }
 
 var skip = false;
@@ -75,7 +70,10 @@ function subscribe() {
   unsubscribe = documentRef.onSnapshot(function (doc) {
     var d = doc.data()
     if (!skip) {
+      var fd = fs.openSync(fname, 'a')
       fs.writeSync(fd, ts() + ": " + d.ts + ": " + d.msg + "\n");
+      fs.closeSync(fd)
+
     }
     else {
       skip = false;
