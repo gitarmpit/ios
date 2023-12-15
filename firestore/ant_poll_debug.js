@@ -70,10 +70,14 @@ function subscribe() {
   unsubscribe = documentRef.onSnapshot(function (doc) {
     var d = doc.data()
     if (!skip) {
-      var fd = fs.openSync(fname, 'a')
-      fs.writeSync(fd, ts() + ": " + d.ts + ": " + d.msg + "\n");
-      fs.closeSync(fd)
-
+      try {
+        var fd = fs.openSync(fname, 'a')
+        fs.writeSync(fd, ts() + ": " + d.ts + ": " + d.msg + "\n");
+        fs.closeSync(fd)
+      }
+      catch (error) {
+        console.log("io error: " + error)
+      }
     }
     else {
       skip = false;
