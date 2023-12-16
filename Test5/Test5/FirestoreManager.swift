@@ -26,14 +26,19 @@ class FireStoreManager: NSObject, ObservableObject {
         saveDataToFirestore(col: "debug", doc: "loc", data: data)
     }
     
-    func addTrip(tripId: String) {
+    func addTrip(tripId: String, lat: Double, long: Double) {
         let timestamp = Timestamp()
+        let currentDate = Date()
+        let secondsSinceEpoch = Int(currentDate.timeIntervalSince1970)
         let data: [String: Any] = [
             "id": tripId,
             "ts": timestamp,
-            "distance": "",
-            "speedAvg": "",
-            "duration": ""
+            "secondsSinceEpoch": secondsSinceEpoch,
+            "distance": 0,
+            "speedAvg": 0,
+            "duration": 0,
+            "lat": lat,
+            "long": long,
         ]
         saveDataToFirestore(col: "trips", doc: tripId, data: data)
     }
@@ -42,11 +47,13 @@ class FireStoreManager: NSObject, ObservableObject {
 
         let ts = createTimeStamp()
         let data: [String: Any] = [
-            "lat": String(format: "%.6f", point.latitude),
-            "long": String(format: "%.6f", point.longitude),
-            "speed": String(format: "%.6f", point.speed),
+            //"lat": String(format: "%.6f", point.latitude),
+            "lat": point.latitude,
+            "long": point.longitude,
+            "speed": point.speed,
             "speedAvg": point.speedAvg,
-            "distance": String(format: "%.3f", point.distance),
+            //"distance": String(format: "%.3f", point.distance),
+            "distance": point.distance,
             "duration": point.duration,
             "ts": ts
         ]
@@ -64,10 +71,11 @@ class FireStoreManager: NSObject, ObservableObject {
         saveDataToFirestore(col: "trips", doc: "current", data: data)
     }
     
-    func updateTrip (tripId: String, distance: Double, speedAvg: Double, duration: String) {
+    func updateTrip (tripId: String, distance: Double, speedAvg: Double, duration: Int) {
         let data: [String: Any] = [
             "speedAvg": speedAvg,
-            "distance": String(format: "%.1f", distance),
+            //"distance": String(format: "%.1f", distance),
+            "distance": distance,
             "duration": duration
         ]
         self.db.collection("trips").document(tripId).updateData(data)   { err in
