@@ -1,12 +1,14 @@
+//
+//  hktestApp.swift
+//  hktest
+//
+//  Created by zolo on 11/30/23.
+//
 
 import SwiftUI
-import Firebase
 
 @main
-struct Test5App: App {
-    init() {
-      FirebaseApp.configure()
-    }
+struct hktestApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()

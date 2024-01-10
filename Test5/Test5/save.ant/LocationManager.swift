@@ -2,13 +2,83 @@ import CoreLocation
 import HealthKit
 import UIKit
 
-class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
+struct TripPoint {
+    var latitude: Double
+    var longitude: Double
+    var speed: Double
+    var speedAvg: Double
+    var duration: String
+    var distance: Double
+}
 
+class SpeedAverage {
+    private var windowSize: Int
+    private var values: [Double] = []
+    
+    var average: Double {
+        return values.reduce(0, +) / Double(values.count)
+    }
+    
+    init(windowSize: Int) {
+        self.windowSize = windowSize
+    }
+    
+    func isFull() -> Bool {
+        return values.count == windowSize
+    }
+    
+    func addValue(_ value: Double) {
+        values.append(value)
+        
+        if values.count > windowSize {
+            values.removeFirst()
+        }
+    }
+    
+    func reset() {
+        values.removeAll()
+    }
+}
+
+class GoodPointAverage {
+    private var windowSize: Int
+    private var values: [Int] = []
+    
+    var average: Double {
+        return Double(values.reduce(0, +)) / Double(values.count)
+    }
+    
+    init(windowSize: Int) {
+        self.windowSize = windowSize
+    }
+    
+    func isFull() -> Bool {
+        return values.count == windowSize
+    }
+    
+    func addValue(_ value: Int) {
+        values.append(value)
+        
+        if values.count > windowSize {
+            values.removeFirst()
+        }
+    }
+    
+    func reset() {
+        values.removeAll()
+    }
+}
+
+
+class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
+    
     @Published var status: String = ""
     @Published var totalDistance: CLLocationDistance = 0.0
     @Published var durationString: String = ""
-    @Published var speed: Double = 0.0
-    @Published var speedAvg: Double = 0.0
+    private var speed: Double = 0.0   //  m/s
+    @Published var speedString = ""
+    private var speedAvg: Double = 0.0 // m/s
+    @Published var speedAvgString = ""
     @Published var stepCountString: String = ""
     private var stepCount: Int = 0
     
@@ -16,7 +86,6 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     private var tooFarAlertSent: Bool = false
     private var speedSum: Double = 0.0
     private var totalCount: Int = 0
-    private var alertMsg: String = ""
     private var validCourse: Bool = false
     
     private    var course: Int = -1
@@ -25,28 +94,31 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     private    var invalidCourseCount: Int = 0
     private var distanceFromHome: CLLocationDistance = 0.0
     
-    private var currentLocation: CLLocation?
+    // Home
+    //39.983344275471424, -86.05587089869636
+    private var forumLoc:  CLLocation = CLLocation(latitude: 39.983344275471424, longitude: -86.05587089869636)
+    
+    //Grosbeak
+    //39.98023367094937, -86.05629468772058
+    private var grosbeakLoc:  CLLocation = CLLocation(latitude: 39.98023367094937, longitude: -86.05629468772058)
+    
+    private let isMph = false
     private var locationString: String = ""
-    private var homeLocation: CLLocation?
+    private var homeLocation: CLLocation
     private var lastLocation: CLLocation?
     private let locationManager = CLLocationManager()
     
-    private let departureProximity: CLLocationDistance = 40.0
-    private let arrivalProximity: CLLocationDistance = 25.0
+    private let departureProximity: CLLocationDistance = 7.0
+    private let arrivalProximity: CLLocationDistance =  5.0
     private let maxAllowedDistance: Double = 1500
     private var lastCourse: Int = -1
     private var leftHomeTs: Date = Date()
     
-    private let logUpdateInterval: Double = 10
+    private let tripLogUpdateInterval: TimeInterval = 10
+    private var lastTripLogUpdateTs: TimeInterval = 0
     
-    // For ping and GPS rate calculation
-    private let pingUpdateInterval: Double = 3600
-    private var lastPingTs: TimeInterval = 0
-    private var gpsUpdateCnt: Int = 0
-    // End of GPS rate calc
-    
-    // Debug update interval
-    private var lastDebugUpdateTs: TimeInterval = 0
+    private var lastHeartbeatTs: TimeInterval = 0
+    private var heartbeatUpdateInterval: TimeInterval = 3600
     
     private let mphMultiplier = 2.23693629
     private let kmhMultiplier = 3.6
@@ -55,25 +127,128 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     private var lastTimeMotionDetected: Date = Date()
     private var stationaryAlertSent: Bool = false
     
-    private let speedMultiplier: Double
     private var fs: FireStoreManager
     private var timer: Timer?
-    private var GPS_Running: Bool = false
+    private var dailyTimer: Timer?
+    
     private let stepSize: Double = 0.6
+    //private let stepSize: Double = 0.78
+    
+    private var sleepMode: Bool = true
+    private var warmupCount: Int = 0
+    
+    private var speedMovingAvg: SpeedAverage = SpeedAverage(windowSize: 100)
+    private var currentTripId: String = ""
     
     init (fs: FireStoreManager) {
         self.fs = fs
-        self.speedMultiplier = kmhMultiplier
+        self.homeLocation = forumLoc
         super.init()
         locationManager.delegate = self
     }
     
     func initLocationManager() {
-        startUpdatingLocation()
+        fs.sendDebug(msg: "Startup: initializing locationManager, starting sleep timer")
+        let msg = String(format: "Home: %.8f, %.8f", homeLocation.coordinate.latitude, homeLocation.coordinate.longitude)
+        fs.sendDebug(msg: msg)
+        locationManager.allowsBackgroundLocationUpdates = true
+        locationManager.pausesLocationUpdatesAutomatically = false
+        //enterReducedPowerMode()
+        //startTimer()
+        //scheduleDailyTimer(hour: 9, fullpower: true)
+        //scheduleDailyTimer(hour: 10, fullpower: false)
+    }
+    
+    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        fs.sendDebug(msg: "locationManagerDidChangeAuthorization fired")
+        if (locationManager.authorizationStatus == .notDetermined) {
+            fs.sendDebug(msg: "first time authorization: request when in use")
+            locationManager.requestWhenInUseAuthorization()
+        }
+        else if (locationManager.authorizationStatus == .authorizedWhenInUse) {
+            fs.sendDebug(msg: "location services: request always")
+            locationManager.requestAlwaysAuthorization()
+        }
+        else if (locationManager.authorizationStatus == .authorizedAlways) {
+            fs.sendDebug(msg: "location services: status=authorizedAlways, starting location service")
+            enterFullPowerMode()
+        }
+        else {
+            fs.sendDebug(msg: "location service: current auth status: " + String(locationManager.authorizationStatus.rawValue))
+        }
+    }
+    
+    func scheduleDailyTimer(hour: Int, fullpower: Bool) {
+        fs.sendDebug(msg: "Scheduling timer at \(hour)")
+        let now = Date()
+        let calendar = Calendar.current
+        let components = calendar.dateComponents([.hour], from: Date())
+        let timeInterval: TimeInterval
+        
+        if hour <= components.hour!  {
+            let tomorrow = calendar.date(byAdding: .day, value: 1, to: now)!
+            let targetDate = calendar.date(bySettingHour: hour, minute: 0, second: 0, of: tomorrow)!
+            timeInterval = targetDate.timeIntervalSinceNow
+            fs.sendDebug(msg: "Scheduling for tomorrow in \(timeInterval/60) min")
+        } else {
+            let targetDate = calendar.date(bySettingHour: hour, minute: 0, second: 0, of: now)!
+            timeInterval = targetDate.timeIntervalSinceNow
+            fs.sendDebug(msg: "Scheduling for today in \(timeInterval/60) min")
+        }
+        
+        dailyTimer = Timer.scheduledTimer(withTimeInterval: timeInterval, repeats: false) { _ in
+            if fullpower {
+                self.enterFullPowerMode()
+            } else {
+                self.enterReducedPowerMode()
+            }
+        }
+    }
+    
+    func startTimer() {
+        timer = Timer.scheduledTimer(withTimeInterval: 1800, repeats: true) { timer in
+            let calendar = Calendar.current
+            let components = calendar.dateComponents([.hour], from: Date())
+            self.fs.sendDebug(msg: "timer")
+            self.heartbeat()
+            if (components.hour == 9) {
+                self.enterFullPowerMode()
+            }
+            else if (components.hour == 12) {
+                self.enterReducedPowerMode()
+            }
+        }
+        //RunLoop.current.add(timer, forMode: .common)
+    }
+    
+    func enterReducedPowerMode() {
+        sleepMode = true
+        isHome = true
+        locationManager.allowsBackgroundLocationUpdates = true
+        locationManager.pausesLocationUpdatesAutomatically = false
+        locationManager.desiredAccuracy = kCLLocationAccuracyReduced
+        self.locationManager.startUpdatingLocation()
+        self.fs.sendDebug(msg: "Entering reduced power mode")
+    }
+    
+    func enterFullPowerMode() {
+        clearAll()
+        sleepMode = false
+        isHome = true
+        locationManager.allowsBackgroundLocationUpdates = true
+        locationManager.pausesLocationUpdatesAutomatically = false
+        locationManager.desiredAccuracy = kCLLocationAccuracyBestForNavigation
+        warmupCount = 0
+        locationManager.startUpdatingLocation()
+        self.fs.sendDebug(msg: "Entering full power mode")
+    }
+    
+    func locationManager(_ manager: CLLocationManager,
+                         didVisit visit: CLVisit) {
+        self.fs.sendDebug(msg: "visit:" + visit.description)
     }
     
     func clearAll()  {
-        currentLocation = nil
         locationString = ""
         totalDistance = 0.0
         distanceFromHome = 0.0
@@ -82,83 +257,53 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         courseDiff = 0
         maxCourseDiff = 0
         speed = 0.0
+        speedString = ""
         speedSum = 0.0
         speedAvg = 0.0
+        speedAvgString = ""
         totalCount = 0
         tooFarAlertSent = false
-        lastLocation = nil
         lastCourse = -1
         leftHomeTs = Date()
-        lastPingTs = 0
-        gpsUpdateCnt = 0
-        lastDebugUpdateTs = 0
+        lastHeartbeatTs = 0
+        lastTripLogUpdateTs = 0
         lastTimeMotionDetected = Date()
         stationaryAlertSent = false
-        alertMsg = ""
         stepCount = 0
         stepCountString = ""
         validCourse = false
         invalidCourseCount = 0
+        speedMovingAvg.reset()
+        currentTripId = ""
     }
-    
-    func startUpdatingLocation() {
-        GPS_Running = true
-        clearAll()
-        locationManager.requestAlwaysAuthorization()
-        locationManager.requestWhenInUseAuthorization()
-        locationManager.desiredAccuracy = kCLLocationAccuracyBestForNavigation
-        //locationManager.desiredAccuracy = kCLLocationAccuracyNearestTenMeters
-        //locationManager.distanceFilter = 10
-        locationManager.allowsBackgroundLocationUpdates = true
-        locationManager.pausesLocationUpdatesAutomatically = false
-        locationManager.startUpdatingLocation()
-    }
-    
-    func stopUpdatingLocation() {
-        GPS_Running = false
-        locationManager.stopUpdatingLocation()
-    }
-    
     
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         if let location = locations.last {
             
-            if (homeLocation == nil) {
-                currentLocation = location
-                setHome()
+            if (!sleepMode && (warmupCount > 10))
+            {
+                update(location: location)
+                if (isHome) {
+                    checkDeparture(location: location)
+                } else {
+                    checkTooFar()
+                    checkMotion()
+                    checkArrival()
+                }
             }
-            
-            ping()
-            update(location: location)
-            
-            if (isHome) {
-                checkDeparture()
-            } else {
-                log()
-                checkTooFar()
-                checkMotion()
-                checkArrival()
+            else {
+                warmupCount += 1
+                if (sleepMode) {
+                    heartbeat()
+                }
             }
-            
-            lastLocation = currentLocation
         }
     }
     
-    func setHome() {
-        homeLocation = currentLocation
-        let msg = String(format: "Home: %.5f, %.5f", homeLocation!.coordinate.latitude, homeLocation!.coordinate.longitude)
-        fs.sendDebug(msg: msg)
-        clearAll()
-    }
-    
-    func ping() {
-        gpsUpdateCnt += 1
-        let timeDiff = Date().timeIntervalSince1970 - lastPingTs
-        if timeDiff >= pingUpdateInterval {
-            let gpsUpdateRate = Double(gpsUpdateCnt) / Double(timeDiff)
-            fs.sendDebug(msg: String(format: "GPS update rate: %.2f", gpsUpdateRate))
-            lastPingTs = Date().timeIntervalSince1970
-            gpsUpdateCnt = 0
+    func heartbeat() {
+        let timeDiff = Date().timeIntervalSince1970 - lastHeartbeatTs
+        if timeDiff >= heartbeatUpdateInterval {
+            lastHeartbeatTs = Date().timeIntervalSince1970
             let batteryLevel = UIDevice.current.batteryLevel
             var batteryState = "???"
             if (UIDevice.current.batteryState == .unplugged) {
@@ -170,13 +315,14 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
             else if (UIDevice.current.batteryState == .full) {
                 batteryState = "full"
             }
-
-            fs.sendDebug(msg: "battery: level=" + String(batteryLevel*100.0) + "%, state: " + batteryState)
+            
+            let msg = "heartbeat: battery: level=" + String(Int(batteryLevel*100.0)) + "%, state: " + batteryState
+            fs.sendDebug(msg: msg)
         }
     }
     
-    func log() {
-        if (Date().timeIntervalSince1970 - lastDebugUpdateTs >= logUpdateInterval) {
+    func tripLog() {
+        if (Date().timeIntervalSince1970 - lastTripLogUpdateTs >= tripLogUpdateInterval) {
             
             let fromHomeString = String(format: "Distance from home: %.2f", distanceFromHome)
             let totalDistanceString = String(format: "Total distance: %.2f", totalDistance)
@@ -190,23 +336,28 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
             msg = courseString + ", " + courseDiffString + ", " + maxCourseDiffString
             fs.sendDebug(msg: msg)
             
-            let speedString = String(format: "Speed: %.2f", speed)
-            let speedAvgString = String(format: "Speed avg: %.2f", speedAvg)
-            msg = speedString + ", " + speedAvgString
-            fs.sendDebug(msg: msg)
+            speedString = speedToString(speed)
+            speedAvgString = speedToString(speedAvg)
+            fs.sendDebug(msg: "speed: " + speedString + ", avg: " + speedAvgString + ", m/s: " + String(format: "%.6f", speed))
             fs.sendDebug(msg: "validCourse: " + String(validCourse) + ", invalidCoureCount: " + String(invalidCourseCount))
             fs.sendDebug(msg: "stepCount: " + String(stepCount))
+            fs.sendDebug(msg: "stepCount: " + String(stepCount))
             fs.sendLocation(loc: locationString)
-            lastDebugUpdateTs = Date().timeIntervalSince1970
+            let tp = TripPoint(
+                latitude: lastLocation!.coordinate.latitude,
+                longitude: lastLocation!.coordinate.longitude,
+                speed: speed,
+                speedAvg: speedAvg,
+                duration: durationString,
+                distance: totalDistance)
+            fs.addPointToTrip(tripId: currentTripId, seq: totalCount, point: tp)
+            lastTripLogUpdateTs = Date().timeIntervalSince1970
         }
     }
     
-    func update(location: CLLocation) {
-        
-        validCourse = false
+    func calcCourse(location: CLLocation) {
         
         let tmpCourse = Int(location.course)
-        // Course
         if (tmpCourse >= 0) {
             course = tmpCourse
             if (lastCourse >= 0) {
@@ -227,70 +378,78 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
             invalidCourseCount += 1
         }
         
+    }
+    
+    func update(location: CLLocation) {
+        
+        calcCourse(location: location)
         var currentSpeed = 0.0
         var distance = 0.0
         
-        //if (validCourse) {
-        locationString = String(format: "%.5f, %.5f", location.coordinate.latitude, location.coordinate.longitude)
-        currentLocation = location
-        if (!isHome && lastLocation != nil) {
-            if (location.speed > 0.14) {
-                distance = location.distance(from: lastLocation!)
-                currentSpeed = location.speed * speedMultiplier
-                //if (distance < 0.3) {
-                //    distance = 0
-                //}
-                //else {
-                //    currentSpeed = location.speed * speedMultiplier
-                //}
-            }
-        }
-        //}
-        
         if (!isHome) {
+            if (location.speed > 0.04 && lastLocation != nil) {
+                distance = location.distance(from: lastLocation!)
+                currentSpeed = location.speed
+                locationString = String(format: "%.6f, %.6f", location.coordinate.latitude, location.coordinate.longitude)
+                lastLocation = location
+                tripLog()
+            }
             totalCount += 1
             speed = currentSpeed
             speedSum += speed
+            speedMovingAvg.addValue(speed)
             speedAvg = speedSum / Double(totalCount)
             totalDistance += distance
             let duration = Date().timeIntervalSince(leftHomeTs)
             //speedAvg = totalDistance / duration * speedMultiplier
             durationString = durationToString(durationInSeconds: duration)
         }
-        distanceFromHome = homeLocation!.distance(from: location)
+        
+        distanceFromHome = homeLocation.distance(from: location)
     }
     
-    func checkDeparture() {
-        if (homeLocation != nil && currentLocation != nil) {
-            let _distanceFromHome = homeLocation!.distance(from: currentLocation!)
-            if (_distanceFromHome > departureProximity) {
-                leftHomeTs = Date()
-                isHome = false
-                clearAll()
-                distanceFromHome = _distanceFromHome
-                //totalDistance = _distanceFromHome
-                fs.sendAlertNotification(msg: "Departure", type: "departure")
-                fs.sendDebug(msg: "Departure")
-            }
+    func checkDeparture(location: CLLocation) {
+        let _distanceFromHome = homeLocation.distance(from: location)
+        if (_distanceFromHome > departureProximity) {
+            leftHomeTs = Date()
+            isHome = false
+            clearAll()
+            distanceFromHome = _distanceFromHome
+            lastLocation = location
+            fs.sendAlertNotification(msg: "Departure", type: "departure")
+            fs.sendDebug(msg: "Departure")
+            currentTripId = generateTimeStamp()
+            fs.addTrip(tripId: currentTripId)
+            
         }
     }
+    
     
     func checkArrival() {
         if (distanceFromHome < arrivalProximity) {
             isHome = true
             let duration = Date().timeIntervalSince(leftHomeTs)
-            speedAvg = totalDistance / duration * speedMultiplier
+            speedAvg = totalDistance / duration
             stepCount = Int(totalDistance / stepSize)
             stepCountString = String(format: "%5d", stepCount)
             speed = 0
-            let msg = "Arrival. Duration:" + durationString
+            let distanceString = String(format: "%.1f", totalDistance)
+            let speedAvgString = speedToString(speedAvg)
+            let msg = "Arrival. Duration:" + durationString + ", Total distance: " + distanceString + ", Avg speed: " + speedAvgString
             fs.sendAlertNotification(msg: msg, type: "arrival")
             fs.sendDebug(msg: msg)
+            fs.updateTrip(tripId: currentTripId, distance: totalDistance, speedAvg: speedAvg, duration: durationString)
         }
     }
     
+    func speedToString(_ speed: Double) -> String {
+        return isMph ?
+            String(format: "%6.1f mph", speed*mphMultiplier) :
+            String(format: "%6.1f km/h", speed*kmhMultiplier)
+    }
+    
     func checkMotion() {
-        if (speed > 0.2) {
+        if (speed > 0.05) {
             lastTimeMotionDetected = Date()
             stationaryAlertSent = false
         }
@@ -301,8 +460,15 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
                 fs.sendAlertNotification(msg: msg, type: "stationary")
                 fs.sendDebug(msg: msg)
                 stationaryAlertSent = true
-                alertMsg = "NOT MOVING"
             }
+        }
+        
+        let timeDiff = Date().timeIntervalSince(leftHomeTs)
+        if (timeDiff > 120 && speedAvg < 0.55) {
+            let msg = "Speed too slow"
+            fs.sendAlertNotification(msg: msg, type: "stationary")
+            fs.sendDebug(msg: msg)
+            stationaryAlertSent = false
         }
         
     }
@@ -314,9 +480,14 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
             fs.sendAlertNotification(msg: msg, type: "tooFar")
             fs.sendDebug(msg: msg)
             tooFarAlertSent = true
-            alertMsg = "TOO FAR"
         }
-        
+    }
+    
+    func generateTimeStamp() -> String {
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        let currentDateTime = Date()
+        return dateFormatter.string(from: currentDateTime)
     }
     
     func durationToString(durationInSeconds: TimeInterval) -> String {

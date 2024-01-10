@@ -15,10 +15,6 @@ const firebaseConfig = {
 };
 
 const app = firebase.initializeApp(firebaseConfig);
-console.log = function (message) {
-  logStream.write(message + '\n');
-  //process.stdout.write(message + '\n');
-};
 
 const db = firebase.firestore();
 
@@ -49,17 +45,11 @@ function ts2() {
   return timestamp;
 }
 
-var logStream = null;
-  var unsubscribe = null;
+var unsubscribe = null;
+var fname = "";
 
 function createLog() {
-  if (logStream !== null) {
-    logStream.end();
-  }
-  const fname = "G:\\My Drive\\logs\\ant." + ts2() + ".txt";
-  //const fname = "ant2." + ts2();
-  logStream = fs.createWriteStream(fname, { flags: 'a' });
-
+  fname = "G:\\My Drive\\logs\\2\\ant." + ts2() + ".txt";
 }
 
 var skip = false;
@@ -80,7 +70,14 @@ function subscribe() {
   unsubscribe = documentRef.onSnapshot(function (doc) {
     var d = doc.data()
     if (!skip) {
-      console.log(ts() + ": " + d.ts + ": " + d.msg);
+      try {
+        var fd = fs.openSync(fname, 'a')
+        fs.writeSync(fd, ts() + ": " + d.ts + ": " + d.msg + "\n");
+        fs.closeSync(fd)
+      }
+      catch (error) {
+        console.log("io error: " + error)
+      }
     }
     else {
       skip = false;
