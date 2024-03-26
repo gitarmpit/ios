@@ -26,36 +26,27 @@ class FireStoreManager: NSObject, ObservableObject {
         saveDataToFirestore(col: "debug", doc: "loc", data: data)
     }
     
-    func addTrip(tripId: String, lat: Double, long: Double) {
+    func addTrip(tripId: String) {
         let timestamp = Timestamp()
-        let currentDate = Date()
-        let secondsSinceEpoch = Int(currentDate.timeIntervalSince1970)
         let data: [String: Any] = [
             "id": tripId,
             "ts": timestamp,
-            "secondsSinceEpoch": secondsSinceEpoch,
-            "distance": 0,
-            "speedAvg": 0,
-            "duration": 0,
-            "lat": lat,
-            "long": long,
+            "distance": "",
+            "speedAvg": "",
+            "duration": ""
         ]
         saveDataToFirestore(col: "trips", doc: tripId, data: data)
     }
 
     func addPointToTrip (tripId: String, seq: Int, point: TripPoint) {
 
-        let ts = createTimeStamp()
         let data: [String: Any] = [
-            //"lat": String(format: "%.6f", point.latitude),
-            "lat": point.latitude,
-            "long": point.longitude,
+            "lat": String(format: "%.6f", point.latitude),
+            "long": String(format: "%.6f", point.longitude),
             "speed": point.speed,
             "speedAvg": point.speedAvg,
-            //"distance": String(format: "%.3f", point.distance),
-            "distance": point.distance,
-            "duration": point.duration,
-            "ts": ts
+            "distance": String(format: "%.3f", point.distance),
+            "duration": point.duration
         ]
 
         let sseq = String(format: "%06d", seq);
@@ -68,14 +59,13 @@ class FireStoreManager: NSObject, ObservableObject {
             self.updateTrip (tripId: tripId, distance: point.distance, speedAvg: point.speedAvg, duration: point.duration)
         }
         
-        saveDataToFirestore(col: "trips", doc: "current", data: data)
+        saveDataToFirestore(col: "trips", doc: "currentTrip", data: data)
     }
     
-    func updateTrip (tripId: String, distance: Double, speedAvg: Double, duration: Int) {
+    func updateTrip (tripId: String, distance: Double, speedAvg: Double, duration: String) {
         let data: [String: Any] = [
             "speedAvg": speedAvg,
-            //"distance": String(format: "%.1f", distance),
-            "distance": distance,
+            "distance": String(format: "%.1f", distance),
             "duration": duration
         ]
         self.db.collection("trips").document(tripId).updateData(data)   { err in
@@ -103,3 +93,4 @@ class FireStoreManager: NSObject, ObservableObject {
     }
     
 }
+

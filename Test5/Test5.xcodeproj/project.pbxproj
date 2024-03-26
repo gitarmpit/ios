@@ -231,7 +231,7 @@
 				ENABLE_PREVIEWS = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Test5/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = AnTracker;
+				INFOPLIST_KEY_CFBundleDisplayName = WalkTrack;
 				INFOPLIST_KEY_LSApplicationCategoryType = "";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "NEED IT";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "NEED IT";
@@ -251,7 +251,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = AnTracker;
+				PRODUCT_BUNDLE_IDENTIFIER = WalkTrack;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";

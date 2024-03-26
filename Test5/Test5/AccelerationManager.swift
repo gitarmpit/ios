@@ -1,7 +1,7 @@
 import Foundation
 import CoreMotion
 
-class AccelerationManager: NSObject, ObservableObject {
+class AccelerationManager: ObservableObject {
     
     private let motionManager = CMMotionManager()
     @Published var accState: String = "???"
