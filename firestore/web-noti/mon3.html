@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no" />
+  <title>Live Monitoring Anatoly</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@v7.2.2/ol.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/ol@v7.2.2/dist/ol.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+
+
+  <style>
+    #map {
+      position: absolute;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      left: 0;
+    }
+
+    #scaleline-id {
+      margin: 10px;
+      font-size: large;
+    }
+
+    .ol-zoom {
+      top: calc(4em);
+      left: calc(100% - 2em);
+      font-size: 1.5em;
+    }
+
+    #toggleLayerButton {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      font-size: 1.5em;
+      z-index: 1;
+    }
+
+    #homeButton {
+      position: absolute;
+      top: 50px;
+      right: 10px;
+      font-size: 1.5em;
+      z-index: 1;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="map"></div>
+  <div id="scaleline-id"></div>
+  <button id="toggleLayerButton" onclick="toggleMapLayer()">Toggle Map Layer</button>
+  <button id="homeButton" onclick="goHome()">
+    <i class="fas fa-home"></i>
+  </button>
+  <script>
+
+    var map;
+    var vectorSource;
+    var currentLayer;
+    var sourceSat;
+    var sourceStreet;
+    var homeLat = -86.05629468772058;
+    var homeLong = 39.98023367094937;
+    var home = [homeLat, homeLong + 0.005];
+    var defaultZoom = 16;
+    var c0 = null;
+    var points = [];
+    let previousFeature = null;
+    let lastCourse = 0.0;
+
+    function initFirebase() {
+      const firebaseConfig = {
+  	apiKey: "AIzaSyBuKZQMqNS72hrTtx2r0bzB3ZOKe3zPzIQ",
+  	authDomain: "noti-27763.firebaseapp.com",
+  	projectId: "noti-27763",
+  	storageBucket: "noti-27763.appspot.com",
+  	messagingSenderId: "436603702917",
+  	appId: "1:436603702917:web:7c9af0cf7eb2d16b16e3ec"
+      };
+
+      const app = firebase.initializeApp(firebaseConfig);
+
+      const db = firebase.firestore();
+      const documentRef = db.doc('debug/debug');
+      const unsubscribe = documentRef.onSnapshot(function (doc) {
+        var d = doc.data()
+	console.log (d.msg)
+        if (d !== null && d.msg !== null) {
+          if (d.msg.includes("Total distance:")) {
+            processMessage(d.msg);
+          }
+          else if (d.msg === "Departure") {
+            resetTrip();
+          }
+        }
+      });
+
+    }
+
+    function parseLocation(inputString) {
+
+      const regex = /loc:\s*(-?\d+\.\d+),\s*(-?\d+\.\d+)/;
+      const matches = inputString.match(regex);
+
+      if (matches) {
+        const longitude = parseFloat(matches[1]);
+        const latitude = parseFloat(matches[2]);
+        return [latitude, longitude];
+
+      } else {
+        return null;
+      }
+    }
+
+    function init() {
+      const key = '6hHN5UkeF1NDIiztQ0kE';
+
+      const attribution = new ol.control.Attribution({
+        collapsible: false,
+      });
+
+      sourceSat = new ol.source.TileJSON({
+        url: `https://api.maptiler.com/maps/satellite/tiles.json?key=${key}`, // source URL
+        tileSize: 512,
+        crossOrigin: 'anonymous'
+      });
+
+      sourceStreet = new ol.source.TileJSON({
+        url: `https://api.maptiler.com/maps/streets-v2/tiles.json?key=${key}`, // source URL
+        tileSize: 512,
+        crossOrigin: 'anonymous'
+      });
+
+      currentLayer = new ol.layer.Tile({
+        source: sourceStreet // Start with the street map layer
+      });
+
+      map = new ol.Map({
+        layers: [
+          currentLayer
+        ],
+        controls: ol.control.defaults.defaults({ attribution: false }).extend([attribution]),
+        target: 'map',
+        view: new ol.View({
+          constrainResolution: true,
+          center: ol.proj.fromLonLat([homeLat, homeLong + 0.005]), // starting position [lng, lat]
+          zoom: defaultZoom, // starting zoom
+        })
+      });
+
+      var scaleline = new ol.control.ScaleLine({
+        div: document.getElementById("scaleline-id")
+      });
+      map.addControl(scaleline);
+
+      vectorSource = new ol.source.Vector();
+      var vectorLayer = new ol.layer.Vector({
+        source: vectorSource,
+      });
+      map.addLayer(vectorLayer);
+      initFirebase();
+      resetTrip();
+    }
+
+    function goHome() {
+      map.getView().setCenter(ol.proj.fromLonLat([homeLat, homeLong + 0.004]));
+      map.getView().setZoom(defaultZoom);
+    }
+
+    function toggleMapLayer() {
+
+      var source = currentLayer.getSource();
+
+      if (source === sourceStreet) {
+        currentLayer.setSource(sourceSat);
+      }
+      else {
+        currentLayer.setSource(sourceStreet);
+      }
+    }
+
+    var arrowStyle = function (feature) {
+      var rotation = feature.get('rotation') || 0;
+
+      return new ol.style.Style({
+        image: new ol.style.Icon({
+          src: 'arrow.png',
+          rotation: rotation // Set the rotation angle for the icon
+        })
+      });
+    };
+
+    var circleStyle = function (feature) {
+
+      return new ol.style.Style({
+        image: new ol.style.Circle({
+          radius: 9, // Set the radius of the circle
+          fill: new ol.style.Fill({
+            color: "white"
+          }),
+          stroke: new ol.style.Stroke({
+            color: "red",
+            width: 4
+          })
+        })
+      });
+    };
+
+    function toRadians(degrees) {
+      return degrees * Math.PI / 180;
+    };
+
+    function bearing(startLat, startLng, destLat, destLng) {
+      startLat = toRadians(startLat);
+      startLng = toRadians(startLng);
+      destLat = toRadians(destLat);
+      destLng = toRadians(destLng);
+
+      y = Math.sin(destLng - startLng) * Math.cos(destLat);
+      x = Math.cos(startLat) * Math.sin(destLat) - Math.sin(startLat) * Math.cos(destLat) * Math.cos(destLng - startLng);
+
+      return Math.atan2(y, x);
+    }
+
+    function resetTrip() {
+      c0 = null;
+      points = [];
+      previousFeature = null;
+      lastCourse = 0.0;
+      vectorSource.clear();
+      goHome();
+    }
+
+    function addPoint(c) {
+      let coord = ol.proj.fromLonLat(c);
+      let point = new ol.Feature(new ol.geom.Point(coord));
+
+      if (previousFeature !== null) {
+        previousFeature.set('rotation', lastCourse);
+        previousFeature.setStyle(arrowStyle);
+      }
+
+      if (c0 !== null) {
+        lastCourse = bearing(c0[1], c0[0], c[1], c[0])
+      }
+
+      point.setStyle(circleStyle);
+      vectorSource.addFeature(point);
+      points.push(coord);
+      c0 = c;
+      previousFeature = point;
+    }
+
+    function processMessage(loc) {
+
+        addPoint(loc)
+
+        var polyline = new ol.Feature(new ol.geom.LineString(points));
+        polyline.setStyle(new ol.style.Style({
+          stroke: new ol.style.Stroke({
+            color: 'brown', // Change the stroke color to green
+            width: 4 // Customize the stroke width of the line
+          })
+        }));
+
+        vectorSource.addFeature(polyline);
+      }
+
+
+    init();
+    processMessage ([homeLat, homeLong+0.001]);
+
+  </script>
+</body>
+</html>

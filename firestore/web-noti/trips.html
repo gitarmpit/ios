@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no" />
+  <title>Live Monitoring Anatoly</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@v7.2.2/ol.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/ol@v7.2.2/dist/ol.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+
+  <style>
+    html,
+    body {
+      height: 100%;
+      margin: 0;
+    }
+
+    #scaleline-id {
+      margin: 10px;
+      font-size: large;
+    }
+
+    .container {
+      display: grid;
+      grid-template-columns: 15em 1fr;
+      height: 100%;
+    }
+
+    #map {
+      height: 100%;
+    }
+
+    .tripList {
+      height: 50%;
+      /*background: #f0eedd;*/
+      background: white;
+      border: 2px solid white;
+      padding: 5px;
+      overflow: scroll;
+    }
+
+    .tripList div {
+      margin-bottom: 2px;
+      padding: 5px;
+      cursor: pointer;
+    }
+
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .controls {
+      position: absolute;
+      top: 1em;
+      right: 2.5em;
+      font-size: 1.2em;
+      z-index: 1;
+      opacity: 0.7;
+    }
+
+    .ol-zoom {
+      position: absolute;
+      top: 1em;
+      left: calc(100% - 2em);
+      font-size: 1.2em;
+      background-color: transparent;
+      opacity: 0.7;
+    }
+
+    .overlay {
+      position: fixed;
+      display: none;
+      width: 100%;
+      height: 100%;
+      top: 0;
+      left: 0;
+      background-color: rgba(0, 0, 0, 0.5);
+      z-index: 2;
+    }
+
+    .prompt-window {
+      background-color: white;
+      width: 300px;
+      padding: 20px;
+      border-radius: 5px;
+      text-align: center;
+      margin: 0 auto;
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+    }
+
+    .message {
+      font-size: 18px;
+      margin-bottom: 10px;
+    }
+
+    .grid-container {
+      display: grid;
+      grid-template-columns: 50% auto;
+      gap: 4px;
+      padding: 4px;
+      margin: 10px;
+    }
+
+    .grid-container .key {
+      text-align: left;
+      white-space: nowrap;
+    }
+
+    .grid-container .value {
+      text-align: right;
+      font-weight: bold;
+    }
+  </style>
+
+</head>
+
+<body>
+  <div class="container">
+    <div class="sidebar">
+      <button onclick="readTrips()" style="margin: 5px; padding: 5px">Refresh trips</button>
+      <div class="tripList"></div>
+
+      <div class="details">
+        <div id="selectedTrip" style="margin: 5px; padding: 5px; text-align: center;min-height: 1em; line-height: 1;">
+        </div>
+        <div class="grid-container">
+          <div class="key">Duration:</div>
+          <div id="duration" class="value"></div>
+          <div class="key">Distance, km:</div>
+          <div id="distance_km" class="value"></div>
+          <div class="key">Distance, mi:</div>
+          <div id="distance_mi" class="value"></div>
+          <div class="key">Speed, km/h:</div>
+          <div id="speed_kmh" class="value"></div>
+          <div class="key">Speed, mph:</div>
+          <div id="speed_mph" class="value"></div>
+          <div class="key">Pace:</div>
+          <div id="pace" class="value"></div>
+          <div class="key">Steps:</div>
+          <div id="steps" class="value"></div>
+        </div>
+      </div>
+
+      <button id="deleteButton" onclick="deleteTrip()" style="margin: 5px; padding: 5px">Delete current trip</button>
+
+
+    </div>
+    <div id="map"></div>
+  </div>
+
+  <div id="overlay" class="overlay">
+    <div class="prompt-window">
+      <div class="message">Set home?</div>
+      <div class="button-container">
+        <button id="yesButton">Yes</button>
+        <button id="noButton">No</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button id="toggleLayerButton" onclick="toggleMapLayer()">Satellite</button>
+    <button id="homeButton" onclick="goHome(homeLat, homeLong)">
+      <i class="fas fa-home"></i>
+    </button>
+    <div class="ol-zoom"></div>
+  </div>
+
+
+  <script>
+
+    var db;
+    var map;
+    var vectorSource;
+    var currentLayer;
+    var sourceSat;
+    var sourceStreet;
+    var homeLong = -86.05629468772058;
+    var homeLat = 39.98023367094937;
+    var defaultZoom = 16;
+    var c0 = null;
+    var points = [];
+    let previousFeature = null;
+    let lastCourse = 0.0;
+    const timestampRegex = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/;
+    var lastDiv = null;
+    var currentTrip = null;
+    const deleteButton = document.getElementById('deleteButton');
+
+    async function addTrip(tripName) {
+      const tripList = document.querySelector('.tripList');
+
+      const div = document.createElement('div');
+      div.textContent = tripName;
+
+      div.addEventListener('click', async () => {
+        if (lastDiv !== null) {
+          lastDiv.style.background = '';
+          lastDiv.style.fontWeight = '';
+        }
+        //div.style.background = '#c7c7b7';
+        div.style.background = '#eeeeee';
+
+        div.style.fontWeight = 'bold';
+        let el = document.getElementById("selectedTrip")
+        el.innerHTML = tripName;
+        await readTrip(tripName);
+        currentTrip = tripName;
+        deleteButton.removeAttribute('disabled', true);
+        lastDiv = div;
+      });
+
+      tripList.appendChild(div);
+      const separator = document.createElement('hr');
+      separator.style.border = 0;
+      separator.style.margin = 0;
+      separator.style.padding = 0;
+      separator.style.borderTop = '1px solid gray';
+      tripList.appendChild(separator);
+    }
+
+
+    function padZero(number) {
+      return number.toString().padStart(2, '0');
+    }
+
+    function formatDuration(durationInSeconds) {
+      const hours = Math.floor(durationInSeconds / 3600);
+      const minutes = Math.floor((durationInSeconds % 3600) / 60);
+      const seconds = durationInSeconds % 60;
+      return `${padZero(hours)}:${padZero(minutes)}:${padZero(seconds)}`;
+    }
+
+
+    async function readTrip(tripName) {
+      try {
+
+        document.getElementById('speed_kmh').textContent = "";
+        document.getElementById('speed_mph').textContent = "";
+        document.getElementById('distance_km').textContent = "";
+        document.getElementById('distance_mi').textContent = "";
+        document.getElementById('duration').textContent = "";
+        document.getElementById('pace').textContent = "";
+        document.getElementById('steps').textContent = "";
+
+        const tripRef = db.collection('trips').doc(tripName);
+        const tripSnapshot = await tripRef.get();
+
+        if (tripSnapshot.exists) {
+          const tripData = tripSnapshot.data();
+          const pointsSnapshot = await tripRef.collection('points').get();
+          if (!pointsSnapshot.empty) {
+            document.getElementById('speed_kmh').textContent = (tripData.speedAvg * 3.6).toFixed(3);
+            document.getElementById('speed_mph').textContent = (tripData.speedAvg * 2.23693629).toFixed(3);
+            document.getElementById('distance_km').textContent = (tripData.distance * 0.001).toFixed(3);
+            const distance_miles = tripData.distance * 0.000621371;
+            document.getElementById('distance_mi').textContent = distance_miles.toFixed(3);
+            document.getElementById('duration').textContent = formatDuration(tripData.duration);
+            if (distance_miles > 0) {
+              const pace = formatDuration(Math.round(tripData.duration / distance_miles));
+              document.getElementById('pace').textContent = pace;
+            }
+            else {
+              document.getElementById('pace').textContent = "";
+            }
+            if (tripData.hasOwnProperty("steps")) {
+              document.getElementById('steps').textContent = tripData.steps;
+            }
+          }
+          resetTrip(tripData.lat, tripData.long);
+          pointsSnapshot.forEach((pointDoc) => {
+            const data = pointDoc.data();
+            const loc = [data.long, data.lat];
+            processPoint(loc);
+          });
+
+        } else {
+          // console.log(`Trip "${tripName}" does not exist.`);
+        }
+      } catch (error) {
+        console.error('Error reading trip:', error);
+      }
+
+    }
+
+    async function initFirebase() {
+      const firebaseConfig = {
+        apiKey: "AIzaSyBuKZQMqNS72hrTtx2r0bzB3ZOKe3zPzIQ",
+        authDomain: "noti-27763.firebaseapp.com",
+        projectId: "noti-27763",
+        storageBucket: "noti-27763.appspot.com",
+        messagingSenderId: "436603702917",
+        appId: "1:436603702917:web:7c9af0cf7eb2d16b16e3ec"
+      };
+
+      const app = firebase.initializeApp(firebaseConfig);
+
+      db = firebase.firestore();
+      readTrips();
+
+    }
+
+    async function readTrips() {
+
+      document.getElementById('speed_kmh').textContent = "";
+      document.getElementById('speed_mph').textContent = "";
+      document.getElementById('distance_km').textContent = "";
+      document.getElementById('distance_mi').textContent = "";
+      document.getElementById('duration').textContent = "";
+      document.getElementById('pace').textContent = "";
+      document.getElementById('steps').textContent = "";
+
+
+      resetTrip(homeLat, homeLong);
+
+      const collectionRef = db.collection('trips');
+      const tripList = document.querySelector('.tripList');
+      while (tripList.firstChild) {
+        tripList.removeChild(tripList.firstChild);
+      }
+
+      let el = document.getElementById("selectedTrip")
+      el.innerHTML = "";
+
+
+      try {
+        const querySnapshot = await collectionRef.get();
+        const docs = querySnapshot.docs;
+
+        for (let i = docs.length - 1; i >= 0; i--) {
+          const doc = docs[i];
+          if (timestampRegex.test(doc.id)) {
+            await addTrip(doc.id);
+          }
+        }
+
+      } catch (error) {
+        console.error('Error getting trips:', error);
+      }
+
+    }
+
+    async function deleteTrip() {
+      if (currentTrip !== null) {
+        console.log("deleting: " + currentTrip);
+        try {
+          const tripRef = db.collection('trips').doc(currentTrip);
+          const tripSnapshot = await tripRef.get();
+
+          if (tripSnapshot.exists) {
+
+            deleteButton.setAttribute('disabled', true);
+            console.log(currentTrip + " exists, deleting");
+            const pointsRef = tripRef.collection('points');
+            const querySnapshot = await pointsRef.get();
+
+            for (const doc of querySnapshot.docs) {
+              await doc.ref.delete();
+            }
+
+            console.log('Subcollection documents deleted:', pointsRef.path);
+
+            await tripRef.delete();
+            console.log('Document deleted:', tripRef.id);
+            readTrips();
+          }
+          else {
+            console.log("doc doesn't exist");
+          }
+        }
+        catch (error) {
+          console.error('Error deleting documents:', error);
+        }
+      }
+    }
+
+    function init() {
+      const key = '6hHN5UkeF1NDIiztQ0kE';
+
+      const attribution = new ol.control.Attribution({
+        collapsible: false,
+      });
+
+      sourceSat = new ol.source.TileJSON({
+        url: `https://api.maptiler.com/maps/satellite/tiles.json?key=${key}`, // source URL
+        tileSize: 512,
+        crossOrigin: 'anonymous'
+      });
+
+      sourceStreet = new ol.source.TileJSON({
+        url: `https://api.maptiler.com/maps/streets-v2/tiles.json?key=${key}`, // source URL
+        tileSize: 512,
+        crossOrigin: 'anonymous'
+      });
+
+      currentLayer = new ol.layer.Tile({
+        source: sourceStreet // Start with the street map layer
+      });
+
+      map = new ol.Map({
+        layers: [
+          currentLayer
+        ],
+        controls: ol.control.defaults.defaults({ attribution: false }).extend([attribution]),
+        target: 'map',
+        view: new ol.View({
+          constrainResolution: true,
+          center: ol.proj.fromLonLat([homeLat, homeLong + 0.005]), // starting position [lng, lat]
+          zoom: defaultZoom, // starting zoom
+        })
+      });
+
+      const overlay = document.getElementById('overlay');
+      const yesButton = document.getElementById('yesButton');
+      const noButton = document.getElementById('noButton');
+      let touchStartTime;
+
+      map.getViewport().addEventListener('contextmenu', function (event) {
+        event.preventDefault();
+        overlay.style.display = 'block';
+
+        const clickedCoordinates = map.getEventCoordinate(event);
+
+        // Convert the coordinates to lat/long (EPSG:4326)
+        const latLongCoordinates = ol.proj.transform(
+          clickedCoordinates,
+          'EPSG:3857', // Source projection (Web Mercator)
+          'EPSG:4326'  // Target projection (WGS84, lat/long)
+        );
+
+        console.log('Clicked Coordinates:', latLongCoordinates);
+      });
+
+      /*
+      map.getViewport().addEventListener('touchstart', function (event) {
+        touchStartTime = new Date().getTime();
+      });
+
+      map.getViewport().addEventListener('touchend', function (event) {
+        const touchEndTime = new Date().getTime();
+        const touchDuration = touchEndTime - touchStartTime;
+
+        if (touchDuration >= 500) { // Adjust the duration as needed
+          event.preventDefault();
+          overlay.style.display = 'block';
+        }
+      });
+      */
+
+      yesButton.addEventListener('click', function () {
+        // Handle 'Yes' button click
+        console.log('Yes clicked');
+        overlay.style.display = 'none';
+      });
+
+      noButton.addEventListener('click', function () {
+        // Handle 'No' button click
+        console.log('No clicked');
+        overlay.style.display = 'none';
+      });
+
+
+      var scaleline = new ol.control.ScaleLine({
+        div: document.getElementById("scaleline-id")
+      });
+      map.addControl(scaleline);
+
+      vectorSource = new ol.source.Vector();
+      var vectorLayer = new ol.layer.Vector({
+        source: vectorSource,
+      });
+      map.addLayer(vectorLayer);
+      initFirebase();
+    }
+
+    function goHome(lat, long) {
+      map.getView().setCenter(ol.proj.fromLonLat([long, lat]));
+      map.getView().setZoom(defaultZoom);
+    }
+
+    function toggleMapLayer() {
+
+      var source = currentLayer.getSource();
+      var button = document.getElementById('toggleLayerButton');
+
+      if (source === sourceStreet) {
+        currentLayer.setSource(sourceSat);
+        button.textContent = 'Street';
+      }
+      else {
+        currentLayer.setSource(sourceStreet);
+        button.textContent = 'Satellite';
+      }
+    }
+
+
+    var arrowStyle = function (feature) {
+      var rotation = feature.get('rotation') || 0;
+
+      return new ol.style.Style({
+        image: new ol.style.Icon({
+          src: 'arrow.png',
+          rotation: rotation // Set the rotation angle for the icon
+        })
+      });
+    };
+
+    var circleStyle = function (feature) {
+
+      return new ol.style.Style({
+        image: new ol.style.Circle({
+          radius: 9, // Set the radius of the circle
+          fill: new ol.style.Fill({
+            color: "white"
+          }),
+          stroke: new ol.style.Stroke({
+            color: "red",
+            width: 4
+          })
+        })
+      });
+    };
+
+    function toRadians(degrees) {
+      return degrees * Math.PI / 180;
+    };
+
+    function bearing(startLat, startLng, destLat, destLng) {
+      startLat = toRadians(startLat);
+      startLng = toRadians(startLng);
+      destLat = toRadians(destLat);
+      destLng = toRadians(destLng);
+
+      y = Math.sin(destLng - startLng) * Math.cos(destLat);
+      x = Math.cos(startLat) * Math.sin(destLat) - Math.sin(startLat) * Math.cos(destLat) * Math.cos(destLng - startLng);
+
+      return Math.atan2(y, x);
+    }
+
+    function resetTrip(lat, long) {
+      c0 = null;
+      points = [];
+      previousFeature = null;
+      lastDiv = null;
+      currentTrip = null;
+      deleteButton.setAttribute('disabled', true);
+      lastCourse = 0.0;
+      vectorSource.clear();
+      goHome(lat, long);
+    }
+
+    function addPoint(c) {
+      let coord = ol.proj.fromLonLat(c);
+      let point = new ol.Feature(new ol.geom.Point(coord));
+
+      if (previousFeature !== null) {
+        previousFeature.set('rotation', lastCourse);
+        previousFeature.setStyle(arrowStyle);
+      }
+
+      if (c0 !== null) {
+        lastCourse = bearing(c0[1], c0[0], c[1], c[0])
+      }
+
+      point.setStyle(circleStyle);
+      vectorSource.addFeature(point);
+      points.push(coord);
+      c0 = c;
+      previousFeature = point;
+    }
+
+    function processPoint(loc) {
+      addPoint(loc)
+      var polyline = new ol.Feature(new ol.geom.LineString(points));
+      polyline.setStyle(new ol.style.Style({
+        stroke: new ol.style.Stroke({
+          color: 'brown', // Change the stroke color to green
+          width: 4 // Customize the stroke width of the line
+        })
+      }));
+
+      vectorSource.addFeature(polyline);
+    }
+
+    init();
+
+  </script>
+</body>
+
+</html>
